@@ -8,26 +8,37 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import yaml
 
-from SLAM.maps.map import MapParams, make_world_grid, world_to_map, map_to_world, OccupancyGrid
-from SLAM.agent.lidar_based import LidarParams, MotionParams, LidarAgent, simulate_lidar_scan
+from SLAM.maps.map import MapParams, make_world_grid, world_to_map, map_to_world
+from core.registry import make
+import plugins  # noqa: F401 ensure registrations
 
 
 def run() -> None:
+    # --- load config ---
+    cfg_path = Path(__file__).parent / "configs" / "default.yaml"
+    with open(cfg_path, "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+
     # --- params ---
-    mparams = MapParams()
-    lparams = LidarParams()
-    mot = MotionParams()
+    mparams = MapParams(**(cfg.get("map", {}) or {}))
 
     # --- world & mapper ---
     world = make_world_grid(mparams)
-    og = OccupancyGrid(mparams)
+    mapper_cfg = cfg.get("mapper", {})
+    mapper = make(mapper_cfg["type"], **(mapper_cfg.get("params", {}) or {}))
 
-    # --- agent ---
-    agent = LidarAgent(lparams, mot)
+    # --- agent & sensor ---
+    agent_cfg = cfg.get("agent", {})
+    sensor_cfg = cfg.get("sensor", {})
+    agent = make(agent_cfg["type"], **(agent_cfg.get("params", {}) or {}))
+    sensor = make(sensor_cfg["type"], **(sensor_cfg.get("params", {}) or {}))
 
     # --- start pose (meters, radians) ---
-    start_row, start_col = 140, 20
+    sim = cfg.get("simulation", {})
+    start_row = sim.get("start_row", 140)
+    start_col = sim.get("start_col", 20)
     x0, y0 = map_to_world(start_row, start_col, mparams)
     pose = (x0, y0, math.radians(0.0))
 
@@ -35,34 +46,36 @@ def run() -> None:
     gt_path = [pose]
 
     # --- simulation loop ---
-    steps = 400
+    steps = int(sim.get("steps", 400))
+    schedule = sim.get("steering_program", [])
+    idx = 0
     for k in range(steps):
-        # simple steering program: arc + straights
-        if k < 120:
-            v = mot.v_nom
-            w = mot.w_nom
-        elif k < 240:
-            v = mot.v_nom
-            w = -mot.w_nom * 0.5
+        # pick v,w based on schedule
+        while idx < len(schedule) and k >= schedule[idx]["until"]:
+            idx += 1
+        if idx < len(schedule):
+            v = float(schedule[idx].get("v", 0.0))
+            w = float(schedule[idx].get("w", 0.0))
         else:
-            v = mot.v_nom
+            v = 0.0
             w = 0.0
 
         # ground-truth evolve
         pose = agent.step(pose, v, w)
         gt_path.append(pose)
 
-        # simulate lidar
-        ranges, angles_used = simulate_lidar_scan(world, pose, lparams, mparams)
+        # sensor reading
+        ranges, angles_used = sensor.read(world, pose)
 
         # mapping update using the actual angles used by the sensor
-        og.update_with_scan(pose, ranges, angles_used, lparams.max_range_m)
+        max_range_m = sensor.params.max_range_m if hasattr(sensor, "params") else 15.0
+        mapper.update_with_scan(pose, ranges, angles_used, max_range_m)
 
     # --- outputs ---
     os.makedirs('/results/plots' , exist_ok=True)
 
     # Plot learned occupancy grid probabilities
-    prob = og.to_prob()
+    prob = mapper.to_prob()
     plt.figure()
     plt.imshow(prob, origin="upper", cmap="gray")
     plt.title("Learned Occupancy Grid (probabilities)")

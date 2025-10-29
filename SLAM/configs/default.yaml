@@ -1,0 +1,41 @@
+map:
+  map_size: [200, 200]
+  map_resolution: 0.1
+  lo_occ: 0.85
+  lo_free: 0.4
+  lo_min: -4.0
+  lo_max: 4.0
+
+agent:
+  type: agent.unicycle
+  params:
+    motion:
+      v_nom: 0.4
+      w_nom: 0.3
+      step_dt: 0.2
+
+sensor:
+  type: sensor.lidar
+  params:
+    params:
+      fov_deg: 270.0
+      num_beams: 180
+      max_range_m: 15.0
+      sigma_r: 0.02
+      dropout_prob: 0.02
+      angle_noise_deg: 0.1
+    map_params: {}
+
+mapper:
+  type: mapper.occupancy_grid
+  params:
+    map_params: {}
+
+simulation:
+  steps: 400
+  start_row: 140
+  start_col: 20
+  steering_program:
+    - { until: 120, v: 0.4, w: 0.3 }
+    - { until: 240, v: 0.4, w: -0.15 }
+    - { until: 400, v: 0.4, w: 0.0 }
