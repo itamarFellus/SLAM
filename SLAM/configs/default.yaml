@@ -31,11 +31,20 @@ mapper:
   params:
     map_params: {}
 
+planner:
+  type: planner.ekf_localization
+  params:
+    init:
+      dt: 0.2
+
+# online policy to produce controls (v,w) each step
+policy:
+  type: policy.reactive_explorer
+  params:
+    config:
+      v_fwd: 0.4
+      w_gain: 1.2
+      min_clearance_m: 0.6
+
 simulation:
-  steps: 400
-  start_row: 140
-  start_col: 20
-  steering_program:
-    - { until: 120, v: 0.4, w: 0.3 }
-    - { until: 240, v: 0.4, w: -0.15 }
-    - { until: 400, v: 0.4, w: 0.0 }
+  steps: 600

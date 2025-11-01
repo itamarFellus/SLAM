@@ -51,8 +51,7 @@ def map_to_world(row: int, col: int, params: MapParams) -> Tuple[float, float]:
 
 
 def bresenham(r0: int, c0: int, r1: int, c1: int) -> Iterable[Tuple[int, int]]:
-    """Grid cells along a line using Bresenham's algorithm."""
-    cells = []
+    """Grid cells along a line using Bresenham's algorithm (generator)."""
     dr = abs(r1 - r0)
     dc = abs(c1 - c0)
     sr = 1 if r0 < r1 else -1
@@ -60,7 +59,7 @@ def bresenham(r0: int, c0: int, r1: int, c1: int) -> Iterable[Tuple[int, int]]:
     err = (dr - dc)
     r, c = r0, c0
     while True:
-        cells.append((r, c))
+        yield (r, c)
         if r == r1 and c == c1:
             break
         e2 = 2 * err
@@ -70,7 +69,6 @@ def bresenham(r0: int, c0: int, r1: int, c1: int) -> Iterable[Tuple[int, int]]:
         if e2 < dr:
             err += dr
             c += sc
-    return cells
 
 
 class OccupancyGrid:
@@ -94,24 +92,49 @@ class OccupancyGrid:
         max_range_m: float,
     ) -> None:
         x, y, yaw = pose
-        for r, ang in zip(ranges, angles):
+        h, w = self.log_odds.shape
+        lo_free = self.params.lo_free
+        lo_occ = self.params.lo_occ
+        
+        # Pre-compute cos/sin for all angles (vectorized)
+        cos_angles = np.cos(angles)
+        sin_angles = np.sin(angles)
+        
+        for r, ang, cos_a, sin_a in zip(ranges, angles, cos_angles, sin_angles):
             # end point in world meters for this beam
-            end_x = x + r * math.cos(ang)
-            end_y = y + r * math.sin(ang)
+            end_x = x + r * cos_a
+            end_y = y + r * sin_a
 
             r0, c0 = world_to_map(x, y, self.params)
             r1, c1 = world_to_map(end_x, end_y, self.params)
 
-            cells = list(bresenham(r0, c0, r1, c1))
-            # Free cells along the ray (except last)
-            for rr, cc in cells[:-1]:
-                if 0 <= rr < self.log_odds.shape[0] and 0 <= cc < self.log_odds.shape[1]:
-                    self.log_odds[rr, cc] -= self.params.lo_free
+            # Collect cells from generator, processing efficiently
+            cells_list = []
+            last_cell = None
+            for cell in bresenham(r0, c0, r1, c1):
+                cells_list.append(cell)
+                last_cell = cell
+            
+            if len(cells_list) == 0:
+                continue
+                
+            # Batch process free cells (all except last) using numpy
+            if len(cells_list) > 1:
+                free_cells = np.array(cells_list[:-1], dtype=np.int32)
+                rows, cols = free_cells[:, 0], free_cells[:, 1]
+                # Vectorized bounds checking
+                valid_mask = (rows >= 0) & (rows < h) & (cols >= 0) & (cols < w)
+                valid_rows = rows[valid_mask]
+                valid_cols = cols[valid_mask]
+                # Batch update using numpy fancy indexing
+                if len(valid_rows) > 0:
+                    self.log_odds[valid_rows, valid_cols] -= lo_free
+            
             # Occupied at the hit (if within max range and not a "no return")
-            if r < max_range_m * 0.999 and len(cells) > 0:
-                rr, cc = cells[-1]
-                if 0 <= rr < self.log_odds.shape[0] and 0 <= cc < self.log_odds.shape[1]:
-                    self.log_odds[rr, cc] += self.params.lo_occ
+            if r < max_range_m * 0.999 and last_cell is not None:
+                rr, cc = last_cell
+                if 0 <= rr < h and 0 <= cc < w:
+                    self.log_odds[rr, cc] += lo_occ
 
         # clamp
         np.clip(self.log_odds, self.params.lo_min, self.params.lo_max, out=self.log_odds)
