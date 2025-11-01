@@ -182,14 +182,14 @@ def run() -> None:
     fig2 = plt.figure()
     plt.imshow(disp, origin="upper", cmap="gray")
     plt.plot(pts_gt[:, 1], pts_gt[:, 0], label="GT path", linewidth=2, 
-             color='red', linestyle='--', marker='o', markersize=2, alpha=0.8)
+             color='red', linestyle='--', marker='o', markersize=2, alpha=1.0)
     # plot EKF trajectory if available
     if len(ekf_path) > 1:
         xs_ekf = [p[0] for p in ekf_path]
         ys_ekf = [p[1] for p in ekf_path]
         pts_ekf = np.array([world_to_map(x, y, mparams) for x, y in zip(xs_ekf, ys_ekf)])
         plt.plot(pts_ekf[:, 1], pts_ekf[:, 0], label="EKF path", linewidth=2, 
-                 color='blue', marker='s', markersize=2, alpha=0.8)
+                 color='blue', marker='s', markersize=2, alpha=0.4)
     plt.legend()
     plt.title("Trajectory over World (for sanity check)")
     plt.tight_layout()
@@ -202,10 +202,10 @@ def run() -> None:
     # Left subplot: Trajectory over world
     ax1.imshow(disp, origin="upper", cmap="gray")
     ax1.plot(pts_gt[:, 1], pts_gt[:, 0], label="GT path", linewidth=2, 
-             color='red', linestyle='--', marker='o', markersize=3, alpha=0.9)
+             color='red', linestyle='--', marker='o', markersize=3, alpha=1.0)
     if len(ekf_path) > 1:
         ax1.plot(pts_ekf[:, 1], pts_ekf[:, 0], label="EKF path", linewidth=2, 
-                 color='blue', marker='s', markersize=3, alpha=0.9)
+                 color='blue', marker='s', markersize=3, alpha=0.4)
     ax1.legend(fontsize=12)
     ax1.set_title("Trajectory over World", fontsize=16)
     ax1.set_xlabel("x (cells)", fontsize=12)
