@@ -7,13 +7,20 @@ import math
 from pathlib import Path
 import time
 
-import matplotlib.pyplot as plt
 import numpy as np
 import yaml
 
 from maps.map import MapParams, make_world_grid, world_to_map, map_to_world
 from core.registry import make
 import plugins  # noqa: F401 ensure registrations
+from plots.figures import (
+    plot_total_reward,
+    plot_coverage,
+    plot_occupancy_grid,
+    plot_seen_mask,
+    plot_trajectories,
+    plot_combined,
+)
 
 
 def check_collision(world: np.ndarray, pose: tuple[float, float, float], mparams: MapParams, 
@@ -82,6 +89,12 @@ def run() -> None:
     policy_cfg = cfg.get("policy", {})
     policy = make(policy_cfg["type"], **(policy_cfg.get("params", {}) or {})) if policy_cfg else None
 
+    # --- reward function (optional) ---
+    reward_cfg = cfg.get("reward", {})
+    reward = make(reward_cfg["type"], **(reward_cfg.get("params", {}) or {})) if reward_cfg else None
+    if reward is not None and hasattr(reward, "reset"):
+        reward.reset()
+
     # --- start pose (meters, radians) ---
     sim = cfg.get("simulation", {})
     # random free-cell start and random yaw
@@ -117,9 +130,13 @@ def run() -> None:
     # --- logs ---
     gt_path = [pose]
     ekf_path = [pose]
+    # Per-step logs for learning supervision
+    reward_total_log: list[float] = []
+    coverage_log: list[float] = []
 
     # --- simulation loop ---
     steps = int(sim.get("steps", 400))
+    cum_reward = 0.0
     for _ in range(steps):
         # sense at current GT pose
         ranges, angles_used = sensor.read(world, pose)
@@ -149,6 +166,18 @@ def run() -> None:
             v_actual, w_actual = v, w
         gt_path.append(pose)
 
+        # Reward after mapping update and collision evaluation
+        if reward is not None and hasattr(reward, "compute"):
+            r_step, _ = reward.compute(mapper, world, pose, ranges, angles_used, collision_detected)
+            cum_reward += float(r_step)
+            reward_total_log.append(float(r_step))
+
+        # Coverage (seen fraction) after mapping update
+        if hasattr(mapper, "get_seen_mask"):
+            coverage_log.append(float(mapper.get_seen_mask().mean()))
+        else:
+            coverage_log.append(float("nan"))
+
         # EKF predict using applied controls (only if no collision)
         if loc is not None and hasattr(loc, "predict"):
             loc.predict(v_actual, w_actual)
@@ -159,67 +188,36 @@ def run() -> None:
     out_dir = Path(__file__).parent / "results" / "plots"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Plot learned occupancy grid probabilities
+    # New folder for learning curves
+    curves_dir = Path(__file__).parent / "results" / "learning_curves"
+    curves_dir.mkdir(parents=True, exist_ok=True)
+
+    if 'reward' in cfg and reward is not None:
+        print(f"Cumulative reward: {cum_reward:.3f}")
+        if len(reward_total_log) > 0:
+            plot_total_reward(reward_total_log, curves_dir)
+
+    if len(coverage_log) > 0:
+        plot_coverage(coverage_log, curves_dir)
+
     prob = mapper.to_prob()
-    fig1 = plt.figure()
-    plt.imshow(prob, origin="upper", cmap="gray")
-    plt.title("Learned Occupancy Grid (probabilities)")
-    plt.xlabel("x (cells)")
-    plt.ylabel("y (cells)")
-    plt.tight_layout()
-    fig1.savefig(out_dir / f"occupancy_grid_final.png", dpi=150)
-    plt.close(fig1)
+    plot_occupancy_grid(prob, out_dir)
 
-    # Plot trajectories over ground-truth world for sanity
-    disp = np.ones_like(world, dtype=float)
-    disp[world == 1] = 0.2
+    if hasattr(mapper, "get_seen_mask"):
+        seen_mask = mapper.get_seen_mask()
+        plot_seen_mask(seen_mask, out_dir)
 
-    xs_gt = [p[0] for p in gt_path]
-    ys_gt = [p[1] for p in gt_path]
-
-    pts_gt = np.array([world_to_map(x, y, mparams) for x, y in zip(xs_gt, ys_gt)])
-
-    fig2 = plt.figure()
-    plt.imshow(disp, origin="upper", cmap="gray")
-    plt.plot(pts_gt[:, 1], pts_gt[:, 0], label="GT path", linewidth=2, 
-             color='red', linestyle='--', marker='o', markersize=2, alpha=1.0)
-    # plot EKF trajectory if available
-    if len(ekf_path) > 1:
-        xs_ekf = [p[0] for p in ekf_path]
-        ys_ekf = [p[1] for p in ekf_path]
-        pts_ekf = np.array([world_to_map(x, y, mparams) for x, y in zip(xs_ekf, ys_ekf)])
-        plt.plot(pts_ekf[:, 1], pts_ekf[:, 0], label="EKF path", linewidth=2, 
-                 color='blue', marker='s', markersize=2, alpha=0.4)
-    plt.legend()
-    plt.title("Trajectory over World (for sanity check)")
-    plt.tight_layout()
-    fig2.savefig(out_dir / f"trajectory_world.png", dpi=150)
-    plt.close(fig2)
-
-    # Combined figure: trajectory and occupancy grid side by side
-    fig3, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
-    
-    # Left subplot: Trajectory over world
-    ax1.imshow(disp, origin="upper", cmap="gray")
-    ax1.plot(pts_gt[:, 1], pts_gt[:, 0], label="GT path", linewidth=2, 
-             color='red', linestyle='--', marker='o', markersize=3, alpha=1.0)
-    if len(ekf_path) > 1:
-        ax1.plot(pts_ekf[:, 1], pts_ekf[:, 0], label="EKF path", linewidth=2, 
-                 color='blue', marker='s', markersize=3, alpha=0.4)
-    ax1.legend(fontsize=12)
-    ax1.set_title("Trajectory over World", fontsize=16)
-    ax1.set_xlabel("x (cells)", fontsize=12)
-    ax1.set_ylabel("y (cells)", fontsize=12)
-    
-    # Right subplot: Occupancy grid
-    ax2.imshow(prob, origin="upper", cmap="gray")
-    ax2.set_title("Learned Occupancy Grid (probabilities)", fontsize=16)
-    ax2.set_xlabel("x (cells)", fontsize=12)
-    ax2.set_ylabel("y (cells)", fontsize=12)
-    
-    plt.tight_layout()
-    fig3.savefig(out_dir / f"combined_trajectory_and_map.png", dpi=150)
-    plt.close(fig3)
+    plot_trajectories(
+        world, gt_path, ekf_path if len(ekf_path) > 1 else None, mparams, out_dir
+    )
+    plot_combined(
+        prob,
+        world,
+        gt_path,
+        ekf_path if len(ekf_path) > 1 else None,
+        mparams,
+        out_dir,
+    )
 
 
 if __name__ == "__main__":

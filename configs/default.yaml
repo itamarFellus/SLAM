@@ -48,3 +48,15 @@ policy:
 
 simulation:
   steps: 500
+
+# reward shaping (optional)
+reward:
+  type: reward.exploration
+  params:
+    config:
+      weight_unknown_reduction: 1.0
+      weight_uncertainty_reduction: 0.2
+      weight_collision_risk: 0.8
+      collision_penalty: 3.0
+      step_penalty: 0.01
+      min_clearance_m: 0.6

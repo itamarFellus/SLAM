@@ -4,7 +4,7 @@ from typing import Tuple
 import numpy as np
 
 from interfaces.mapper import Mapper
-from SLAM.maps.map import MapParams, OccupancyGrid as _OccupancyGrid
+from maps.map import MapParams, OccupancyGrid as _OccupancyGrid
 
 
 class OccupancyGridMapper(Mapper):
@@ -23,5 +23,11 @@ class OccupancyGridMapper(Mapper):
 
     def to_prob(self) -> np.ndarray:
         return self._delegate.to_prob()
+
+    def to_log_odds(self) -> np.ndarray:
+        return self._delegate.log_odds.copy()
+
+    def get_seen_mask(self) -> np.ndarray:
+        return self._delegate.get_seen_mask()
 
 

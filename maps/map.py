@@ -83,6 +83,7 @@ class OccupancyGrid:
         self.params = params
         h, w = params.map_size
         self.log_odds = np.zeros((h, w), dtype=np.float32)
+        self.seen = np.zeros((h, w), dtype=bool)
 
     def update_with_scan(
         self,
@@ -117,6 +118,13 @@ class OccupancyGrid:
             
             if len(cells_list) == 0:
                 continue
+            
+            # Mark all traversed cells (including endpoint) as seen
+            seen_cells = np.array(cells_list, dtype=np.int32)
+            rows_all, cols_all = seen_cells[:, 0], seen_cells[:, 1]
+            valid_all = (rows_all >= 0) & (rows_all < h) & (cols_all >= 0) & (cols_all < w)
+            if np.any(valid_all):
+                self.seen[rows_all[valid_all], cols_all[valid_all]] = True
                 
             # Batch process free cells (all except last) using numpy
             if len(cells_list) > 1:
@@ -141,3 +149,6 @@ class OccupancyGrid:
 
     def to_prob(self) -> np.ndarray:
         return 1.0 - 1.0 / (1.0 + np.exp(self.log_odds))
+
+    def get_seen_mask(self) -> np.ndarray:
+        return self.seen.copy()

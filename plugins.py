@@ -7,6 +7,7 @@ from mappers.occupancy_grid import OccupancyGridMapper
 from maps.map import MapParams
 from planners.ekf_localization import EKFLocalization, EKFInit
 from policies.reactive_explorer import ReactiveExplorer, ExplorerConfig
+from rewards.exploration_reward import ExplorationReward, ExplorationRewardConfig
 
 
 @register("agent.unicycle")
@@ -39,4 +40,9 @@ def _make_ekf_localization(init: dict | None = None, init_pose: tuple | None = N
 def _make_reactive_explorer(config: dict | None = None):
     return ReactiveExplorer(cfg=ExplorerConfig(**(config or {})))
 
+
+
+@register("reward.exploration")
+def _make_exploration_reward(config: dict | None = None):
+    return ExplorationReward(config=ExplorationRewardConfig(**(config or {})))
 
