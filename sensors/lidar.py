@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from interfaces.sensor import Sensor
-from SLAM.agent.lidar_based import (
+from agent.lidar_based import (
     LidarParams as _LidarParams,
     simulate_lidar_scan as _simulate_lidar_scan,
 )
-from SLAM.maps.map import MapParams
+from maps.map import MapParams
 
 
 @dataclass

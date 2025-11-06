@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Tuple
 import numpy as np
 
-from SLAM.maps.map import world_to_map, MapParams
+from maps.map import world_to_map, MapParams
 
 
 @dataclass

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from interfaces.agent import Agent
-from SLAM.agent.lidar_based import MotionParams as _MotionParams, step_motion as _step_motion
+from agent.lidar_based import MotionParams as _MotionParams, step_motion as _step_motion
 
 
 @dataclass
