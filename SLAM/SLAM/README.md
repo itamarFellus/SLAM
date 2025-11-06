@@ -1,6 +1,6 @@
-# SLAM Module
+# SLAM Module Overview
 
-This directory contains the core SLAM (Simultaneous Localization and Mapping) implementation.
+This document summarizes the core SLAM (Simultaneous Localization and Mapping) components provided by this repository.
 
 ## Overview
 
@@ -65,8 +65,8 @@ The map generation creates synthetic environments with:
 ## Usage Example
 
 ```python
-from SLAM.maps.map import MapParams, OccupancyGrid, world_to_map
-from SLAM.planners.ekf_localization import EKFLocalization
+from maps.map import MapParams, OccupancyGrid
+from planners.ekf_localization import EKFLocalization
 
 # Create map
 params = MapParams(map_size=(200, 200), map_resolution=0.1)
@@ -76,10 +76,13 @@ grid = OccupancyGrid(params)
 ekf = EKFLocalization(init_pose=(0.0, 0.0, 0.0))
 
 # Update map with sensor data
+pose = (0.0, 0.0, 0.0)
 ranges = ...  # LiDAR ranges
-angles = ...  # LiDAR angles
-grid.update_with_scan(pose, ranges, angles, max_range=15.0)
+angles = ...  # LiDAR angles (radians in sensor frame)
+grid.update_with_scan(pose, ranges, angles, max_range_m=15.0)
 ```
+
+Note: If you install this repository as a package named `SLAM`, you can alternatively import with the `SLAM.*` prefix (for example, `from SLAM.maps.map import MapParams`).
 
 ## Coordinate Systems
 

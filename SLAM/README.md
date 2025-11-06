@@ -17,26 +17,30 @@ A modular SLAM (Simultaneous Localization and Mapping) simulation framework impl
 
 ```
 SLAM/
-├── agents/              # Robot agent implementations
-│   └── unicycle.py     # Unicycle motion model
-├── core/               # Core system components
-│   └── registry.py    # Component registry pattern
-├── configs/            # Configuration files
-│   └── default.yaml   # Default simulation configuration
-├── interfaces/         # Abstract base classes
-├── maps/              # Map generation and utilities
-│   └── map.py         # Map parameters and occupancy grid
-├── mappers/           # Mapping algorithms
+├── agents/               # Robot agent implementations
+│   └── unicycle.py       # Unicycle motion model
+├── core/                 # Core system components
+│   └── registry.py       # Component registry pattern
+├── configs/              # Configuration files
+│   └── default.yaml      # Default simulation configuration
+├── interfaces/           # Abstract base classes (agent, planner, mapper, sensor, reward)
+├── rewards/              # Reward functions for shaping exploration
+│   └── exploration_reward.py
+├── plots/                # Plotting utilities
+│   └── figures.py
+├── maps/                 # Map generation and utilities
+│   └── map.py            # Map parameters and occupancy grid
+├── mappers/              # Mapping algorithms
 │   └── occupancy_grid.py
-├── planners/          # Localization planners
+├── planners/             # Localization planners
 │   └── ekf_localization.py
-├── policies/          # Control policies
+├── policies/             # Control policies
 │   └── reactive_explorer.py
-├── sensors/           # Sensor implementations
-│   └── lidar.py       # LiDAR sensor simulation
-├── results/           # Output directory for plots
-├── main.py            # Main simulation script
-└── plugins.py         # Component registration
+├── sensors/              # Sensor implementations
+│   └── lidar.py          # LiDAR sensor simulation
+├── results/              # Outputs (plots/ and learning_curves/)
+├── main.py               # Main simulation script
+└── plugins.py            # Component registration
 
 ```
 
@@ -44,7 +48,7 @@ SLAM/
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.9+
 - NumPy
 - Matplotlib
 - PyYAML
@@ -77,6 +81,7 @@ Edit `configs/default.yaml` to customize:
 - **Sensor parameters**: LiDAR FOV, number of beams, range, noise models
 - **Localization**: EKF initialization parameters
 - **Policy**: Exploration behavior parameters
+- **Reward**: Exploration shaping weights and penalties (optional)
 - **Simulation**: Number of steps
 
 Example configuration:
@@ -117,6 +122,11 @@ The simulation generates three visualization plots in `results/plots/`:
 1. **occupancy_grid_final.png**: Learned occupancy grid probabilities
 2. **trajectory_world.png**: Ground-truth and EKF-estimated trajectories overlaid on the world map
 3. **combined_trajectory_and_map.png**: Side-by-side comparison of trajectories and learned map
+
+If reward logging is enabled (default in `configs/default.yaml`), learning curves are written to `results/learning_curves/`:
+
+- `total_reward.png`: Per-step reward over time
+- `coverage.png`: Fraction of cells observed over time
 
 ### Trajectory Visualization
 
