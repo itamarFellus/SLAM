@@ -277,4 +277,4 @@ Feel free to extend the system with:
 ## References
 
 - Probabilistic Robotics (Thrun, Burgard, Fox)
-- SLAM literature on EKF and occupancy grid mapping
+- Reinforcement Learning - An Introduction (Barto, S. Sutton)

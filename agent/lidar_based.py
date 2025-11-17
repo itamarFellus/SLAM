@@ -22,6 +22,8 @@ class MotionParams:
     v_nom: float = 0.4               # linear velocity (m/s)
     w_nom: float = 0.3               # angular velocity (rad/s)
     step_dt: float = 0.2             # seconds
+    v_slow: float = 0.2              # absolute slow linear speed (m/s)
+    w_slow: float = 0.15             # absolute slow angular speed (rad/s)
 
 
 def step_motion(pose: Tuple[float, float, float], v: float, w: float, dt: float) -> Tuple[float, float, float]:
@@ -88,7 +90,11 @@ class LidarAgent:
         self.lidar = lidar
         self.motion = motion
 
-    def step(self, pose: Tuple[float, float, float], v: float | None = None, w: float | None = None) -> Tuple[float, float, float]:
-        v = self.motion.v_nom if v is None else v
-        w = self.motion.w_nom if w is None else w
-        return step_motion(pose, v, w, self.motion.step_dt)
+    def step(self, pose: Tuple[float, float, float], v: float | None = None, w: float | None = None, slow: bool = False) -> Tuple[float, float, float]:
+        if slow:
+            v_eff = self.motion.v_slow
+            w_eff = self.motion.w_slow
+        else:
+            v_eff = self.motion.v_nom if v is None else v
+            w_eff = self.motion.w_nom if w is None else w
+        return step_motion(pose, v_eff, w_eff, self.motion.step_dt)

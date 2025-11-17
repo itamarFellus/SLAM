@@ -5,8 +5,10 @@ from agents.unicycle import UnicycleAgent, UnicycleMotionConfig
 from sensors.lidar import LidarSensor, LidarConfig
 from mappers.occupancy_grid import OccupancyGridMapper
 from maps.map import MapParams
+from agent.lidar_based import LidarParams
 from planners.ekf_localization import EKFLocalization, EKFInit
 from policies.reactive_explorer import ReactiveExplorer, ExplorerConfig
+from policies.reward_based_explorer import RewardBasedExplorer, RewardBasedConfig
 from rewards.exploration_reward import ExplorationReward, ExplorationRewardConfig
 
 
@@ -40,6 +42,20 @@ def _make_ekf_localization(init: dict | None = None, init_pose: tuple | None = N
 def _make_reactive_explorer(config: dict | None = None):
     return ReactiveExplorer(cfg=ExplorerConfig(**(config or {})))
 
+
+@register("policy.reward_based_explorer")
+def _make_reward_based_explorer(config: dict | None = None, reward: dict | None = None, init_pose: tuple | None = None, map_params: dict | None = None, lidar_params: dict | None = None):
+    # Factory provided for completeness; typical use wires concrete objects directly
+    m_cfg = MapParams(**(map_params or {})) if map_params else MapParams()
+    l_cfg = LidarParams(**(lidar_params or {})) if lidar_params else LidarParams()
+    ekf = EKFLocalization(init_pose=init_pose if init_pose is not None else (0.0, 0.0, 0.0), cfg=EKFInit())
+    return RewardBasedExplorer(
+        ekf=ekf,
+        lidar_params=l_cfg,
+        map_params=m_cfg,
+        reward_cfg=ExplorationRewardConfig(**(reward or {})),
+        cfg=RewardBasedConfig(**(config or {})),
+    )
 
 
 @register("reward.exploration")
